@@ -47,6 +47,10 @@ func (this *AppTrans) Submit(orderId string, amount float64, desc string, client
 
 	//Verify the sign of response
 	resultInMap := placeOrderResult.ToMap()
+	if resultInMap["return_code"] == "FAIL" {
+		err = errors.New(resultInMap["return_msg"])
+		return "", err
+	}
 	wantSign := Sign(resultInMap, this.Config.AppKey)
 	gotSign := resultInMap["sign"]
 	if wantSign != gotSign {
