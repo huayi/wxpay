@@ -81,6 +81,19 @@ func (this *AppTrans) newQueryXml(transId string) string {
 	return ToXmlString(param)
 }
 
+func (this *AppTrans) newQueryByTradeNoXml(tradeNo string) string {
+	param := make(map[string]string)
+	param["appid"] = this.Config.AppId
+	param["mch_id"] = this.Config.MchId
+	param["out_trade_no"] = tradeNo
+	param["nonce_str"] = NewNonceString()
+
+	sign := Sign(param, this.Config.AppKey)
+	param["sign"] = sign
+
+	return ToXmlString(param)
+}
+
 // Query the order from weixin pay server by transaction id of weixin pay
 func (this *AppTrans) Query(transId string) (QueryOrderResult, error) {
 	queryOrderResult := QueryOrderResult{}
@@ -90,6 +103,31 @@ func (this *AppTrans) Query(transId string) (QueryOrderResult, error) {
 	resp, err := doHttpPost(this.Config.QueryOrderUrl, []byte(queryXml))
 	if err != nil {
 		return queryOrderResult, nil
+	}
+
+	queryOrderResult, err = ParseQueryOrderResult(resp)
+	if err != nil {
+		return queryOrderResult, err
+	}
+
+	//verity sign of response
+	resultInMap := queryOrderResult.ToMap()
+	wantSign := Sign(resultInMap, this.Config.AppKey)
+	gotSign := resultInMap["sign"]
+	if wantSign != gotSign {
+		return queryOrderResult, fmt.Errorf("sign not match, want:%s, got:%s", wantSign, gotSign)
+	}
+
+	return queryOrderResult, nil
+}
+
+func (this *AppTrans) QueryByTradeNo(tradeNo string) (QueryOrderResult, error) {
+	queryOrderResult := QueryOrderResult{}
+
+	queryXml := this.newQueryByTradeNoXml(tradeNo)
+	resp, err := doHttpPost(this.Config.QueryOrderUrl, []byte(queryXml))
+	if err != nil {
+		return queryOrderResult, err
 	}
 
 	queryOrderResult, err = ParseQueryOrderResult(resp)
